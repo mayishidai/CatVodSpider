@@ -6,7 +6,9 @@ import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+/*
+和Xpath区别是，支持extend匹配筛选
+ */
 public class XPathMacFilter extends XPathMac {
 
     @Override
@@ -16,8 +18,8 @@ public class XPathMacFilter extends XPathMac {
             for (String key : extend.keySet()) {
                 String value = extend.get(key);
                 if (TextUtils.isEmpty(value)) continue;
-                cateUrl = cateUrl.replace("{" + key + "}", URLEncoder.encode(value));
-            }
+                    cateUrl = cateUrl.replace("{" + key + "}", URLEncoder.encode(value));
+                }
         }
         cateUrl = cateUrl.replace("{cateId}", tid).replace("{catePg}", pg);
         Matcher m = Pattern.compile("\\{(.*?)\\}").matcher(cateUrl);

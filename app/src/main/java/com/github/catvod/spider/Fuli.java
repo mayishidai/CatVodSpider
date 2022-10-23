@@ -3,18 +3,12 @@ package com.github.catvod.spider;
 import android.content.Context;
 import android.text.TextUtils;
 
-import com.github.catvod.bean.Class;
-import com.github.catvod.bean.Result;
-import com.github.catvod.bean.Vod;
-import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderDebug;
-import com.github.catvod.net.OkHttpUtil;
 import com.github.catvod.utils.Misc;
-import com.github.catvod.utils.Trans;
+import com.github.catvod.net.OkHttpUtil;
 import com.github.catvod.xpath.XPathRule;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.seimicrawler.xpath.JXDocument;
 import org.seimicrawler.xpath.JXNode;
@@ -25,41 +19,34 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
-public class XPath extends Spider {
-
-    protected XPathRule rule = null;
-
-    private HashMap<String, String> getHeaders() {
-        HashMap<String, String> headers = new HashMap<>();
-        headers.put("User-Agent", rule.getUa().isEmpty() ? Misc.CHROME : rule.getUa());
-        return headers;
-    }
-
-    private void fetchRule(String ext) {
-        if (ext.startsWith("http")) {
-            String json = OkHttpUtil.string(ext);
-            rule = XPathRule.fromJson(json);
-            loadRuleExt(json);
-        } else {
-            rule = XPathRule.fromJson(ext);
-            loadRuleExt(ext);
-        }
-    }
+public class Fuli extends XPath {
 
     @Override
+    public void init(Context context) {
+        super.init(context);
+    }
+
     public void init(Context context, String extend) {
         super.init(context, extend);
-        fetchRule(extend);
+        this.ext = extend;
     }
 
     @Override
-    public String homeContent(boolean filter) throws JSONException {
-        List<Vod> list = new ArrayList<>();
-        List<Class> classes = new ArrayList<>();
+    public String homeContent(boolean filter) {
+        try {
+            fetchRule();
+            JSONObject result = new JSONObject();
+            JSONArray classes = new JSONArray();
             if (rule.getCateManual().size() > 0) {
                 Set<String> keys = rule.getCateManual().keySet();
-            for (String k : keys) classes.add(new Class(rule.getCateManual().get(k), k));
+                for (String k : keys) {
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.put("type_name", k);
+                    jsonObject.put("type_id", rule.getCateManual().get(k));
+                    classes.put(jsonObject);
                 }
+            }
+            try {
                 String webUrl = rule.getHomeUrl();
                 JXDocument doc = JXDocument.create(fetch(webUrl));
                 if (rule.getCateManual().size() == 0) {
@@ -69,10 +56,15 @@ public class XPath extends Spider {
                         name = rule.getCateNameR(name);
                         String id = navNodes.get(i).selOne(rule.getCateId()).asString().trim();
                         id = rule.getCateIdR(id);
-                classes.add(new Class(id, name));
+                        JSONObject jsonObject = new JSONObject();
+                        jsonObject.put("type_id", id);
+                        jsonObject.put("type_name", name);
+                        classes.put(jsonObject);
                     }
                 }
                 if (!rule.getHomeVodNode().isEmpty()) {
+                    try {
+                        JSONArray videos = new JSONArray();
                         List<JXNode> vodNodes = doc.selN(rule.getHomeVodNode());
                         for (int i = 0; i < vodNodes.size(); i++) {
                             String name = vodNodes.get(i).selOne(rule.getHomeVodName()).asString().trim();
@@ -88,14 +80,53 @@ public class XPath extends Spider {
                                     mark = vodNodes.get(i).selOne(rule.getHomeVodMark()).asString().trim();
                                     mark = rule.getHomeVodMarkR(mark);
                                 } catch (Exception e) {
-                                    SpiderDebug.log(e);
+                                    SpiderDebug.log("homeContent"+e);
                                 }
                             }
-                list.add(new Vod(id, name, pic, mark));
+                            JSONObject v = new JSONObject();
+                            v.put("vod_id", id);
+                            v.put("vod_name", name);
+                            v.put("vod_pic", pic);
+                            v.put("vod_remarks", mark);
+                            videos.put(v);
                         }
+                        result.put("list", videos);
+                    } catch (Exception e) {
+                        SpiderDebug.log("homeContent"+e);
                     }
-        return Result.string(classes, list, rule.getFilter());
                 }
+            } catch (Exception e) {
+                SpiderDebug.log("homeContent"+e);
+            }
+            result.put("class", classes);
+            if (filter && rule.getFilter() != null) {
+                result.put("filters", rule.getFilter());
+            }
+            return result.toString();
+        } catch (
+                Exception e) {
+            SpiderDebug.log("homeContent"+e);
+        }
+        return "";
+    }
+
+    protected HashMap<String, String> getHeaders(String url) {
+        HashMap<String, String> headers = new HashMap<>();
+        headers.put("User-Agent", rule.getUa().isEmpty()
+                ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36"
+                : rule.getUa());
+        return headers;
+    }
+
+    @Override
+    public String homeVideoContent() {
+        try {
+            fetchRule();
+        } catch (Exception e) {
+            SpiderDebug.log("homeVideoContent"+e);
+        }
+        return "";
+    }
 
     protected String categoryUrl(String tid, String pg, boolean filter, HashMap<String, String> extend) {
         String url = rule.getCateUrl().replace("{cateId}", tid).replace("{catePg}", pg);
@@ -105,14 +136,16 @@ public class XPath extends Spider {
                 url = url.replace(String.format("{%s}", key), extend.get(key));
             }
         }
-        SpiderDebug.log(String.format("categoryUrl -> url: %s", url));
+        SpiderDebug.log("categoryUrl"+String.format("categoryUrl -> url: %s", url));
         return url;
     }
 
     @Override
     public String categoryContent(String tid, String pg, boolean filter, HashMap<String, String> extend) {
+        try {
+            fetchRule();
             String webUrl = categoryUrl(tid, pg, filter, extend);
-        List<Vod> list = new ArrayList<>();
+            JSONArray videos = new JSONArray();
             JXDocument doc = JXDocument.create(fetch(webUrl));
             List<JXNode> vodNodes = doc.selN(rule.getCateVodNode());
             for (int i = 0; i < vodNodes.size(); i++) {
@@ -129,32 +162,51 @@ public class XPath extends Spider {
                         mark = vodNodes.get(i).selOne(rule.getCateVodMark()).asString().trim();
                         mark = rule.getCateVodMarkR(mark);
                     } catch (Exception e) {
-                        SpiderDebug.log(e);
+                        SpiderDebug.log("categoryContent:"+e);
                     }
                 }
-            list.add(new Vod(id, name, pic, mark));
+                JSONObject v = new JSONObject();
+                v.put("vod_id", id);
+                v.put("vod_name", name);
+                v.put("vod_pic", pic);
+                v.put("vod_remarks", mark);
+                videos.put(v);
             }
-        return Result.string(list);
+            JSONObject result = new JSONObject();
+            result.put("page", pg);
+            result.put("pagecount", Integer.MAX_VALUE);
+            result.put("limit", 90);
+            result.put("total", Integer.MAX_VALUE);
+            result.put("list", videos);
+            return result.toString();
+        } catch (Exception e) {
+            SpiderDebug.log("categoryContent:"+e);
         }
+        return "";
+    }
+
+    protected void detailContentExt(String content, JSONObject vod) {
+
+    }
 
     @Override
-    public String detailContent(List<String> ids) throws JSONException {
+    public String detailContent(List<String> ids) {
+        try {
+            fetchRule();
             String webUrl = rule.getDetailUrl().replace("{vid}", ids.get(0));
             String webContent = fetch(webUrl);
             JXDocument doc = JXDocument.create(webContent);
             JXNode vodNode = doc.selNOne(rule.getDetailNode());
+
             String cover = "", title = "", desc = "", category = "", area = "", year = "", remark = "", director = "", actor = "";
+
             title = vodNode.selOne(rule.getDetailName()).asString().trim();
             title = rule.getDetailNameR(title);
-        if (!rule.getDetailImg().isEmpty()) {
-            try {
+
             cover = vodNode.selOne(rule.getDetailImg()).asString().trim();
             cover = rule.getDetailImgR(cover);
             cover = Misc.fixUrl(webUrl, cover);
-            } catch (Exception e) {
-                SpiderDebug.log(e);
-            }
-        }
+
             if (!rule.getDetailCate().isEmpty()) {
                 try {
                     category = vodNode.selOne(rule.getDetailCate()).asString().trim();
@@ -212,73 +264,113 @@ public class XPath extends Spider {
                 }
             }
 
-        Vod vod = new Vod();
-        vod.setVodId(ids.get(0));
-        vod.setVodName(title);
-        vod.setVodPic(cover);
-        vod.setTypeName(category);
-        vod.setVodYear(year);
-        vod.setVodArea(area);
-        vod.setVodRemarks(remark);
-        vod.setVodActor(actor);
-        vod.setVodDirector(director);
-        vod.setVodContent(desc);
+            JSONObject vod = new JSONObject();
+            vod.put("vod_id", ids.get(0));
+            vod.put("vod_name", title);
+            vod.put("vod_pic", cover);
+            vod.put("type_name", category);
+            vod.put("vod_year", year);
+            vod.put("vod_area", area);
+            vod.put("vod_remarks", remark);
+            vod.put("vod_actor", actor);
+            vod.put("vod_director", director);
+            vod.put("vod_content", desc);
 
             ArrayList<String> playFrom = new ArrayList<>();
+
             List<JXNode> fromNodes = doc.selN(rule.getDetailFromNode());
             for (int i = 0; i < fromNodes.size(); i++) {
                 String name = fromNodes.get(i).selOne(rule.getDetailFromName()).asString().trim();
                 name = rule.getDetailFromNameR(name);
                 playFrom.add(name);
             }
-
             ArrayList<String> playList = new ArrayList<>();
-            List<JXNode> urlListNodes = doc.selN(rule.getDetailUrlNode());
-            for (int i = 0; i < urlListNodes.size(); i++) {
-                List<JXNode> urlNodes = urlListNodes.get(i).sel(rule.getDetailUrlSubNode());
-                List<String> vodItems = new ArrayList<>();
-                for (int j = 0; j < urlNodes.size(); j++) {
-                    String name = urlNodes.get(j).selOne(rule.getDetailUrlName()).asString().trim();
-                    name = rule.getDetailUrlNameR(name);
-                    String id = urlNodes.get(j).selOne(rule.getDetailUrlId()).asString().trim();
-                    id = rule.getDetailUrlIdR(id);
-                vodItems.add(Trans.get(name) + "$" + id);
+            if (webUrl.contains("wzk666.xyz")) {
+                playFrom.add("自定义");
+                playList.add(String.format("正片$%s", ids.get(0)));
+            }else {
+                List<JXNode> urlListNodes = doc.selN(rule.getDetailUrlNode());
+                for (int i = 0; i < urlListNodes.size(); i++) {
+                    List<JXNode> urlNodes = urlListNodes.get(i).sel(rule.getDetailUrlSubNode());
+                    List<String> vodItems = new ArrayList<>();
+                    for (int j = 0; j < urlNodes.size(); j++) {
+                        String name = urlNodes.get(j).selOne(rule.getDetailUrlName()).asString().trim();
+                        name = rule.getDetailUrlNameR(name);
+                        String id = urlNodes.get(j).selOne(rule.getDetailUrlId()).asString().trim();
+                        id = rule.getDetailUrlIdR(id);
+                        vodItems.add(name + "$" + id);
+                    }
+                    // 排除播放列表为空的播放源
+                    if (vodItems.size() == 0 && playFrom.size() > i) {
+                        playFrom.set(i, "");
+                    }
+                    playList.add(TextUtils.join("#", vodItems));
                 }
-                if (vodItems.size() == 0 && playFrom.size() > i) {
-                    playFrom.set(i, "");
-                }
-                playList.add(TextUtils.join("#", vodItems));
             }
+            // 排除播放列表为空的播放源
             for (int i = playFrom.size() - 1; i >= 0; i--) {
-            if (playFrom.get(i).isEmpty()) playFrom.remove(i);
+                if (playFrom.get(i).isEmpty())
+                    playFrom.remove(i);
             }
             for (int i = playList.size() - 1; i >= 0; i--) {
-            if (playList.get(i).isEmpty()) playList.remove(i);
+                if (playList.get(i).isEmpty())
+                    playList.remove(i);
             }
             for (int i = playList.size() - 1; i >= 0; i--) {
-            if (i >= playFrom.size()) playList.remove(i);
+                if (i >= playFrom.size())
+                    playList.remove(i);
             }
-        vod.setVodPlayFrom(TextUtils.join("$$$", playFrom));
-        vod.setVodPlayUrl(TextUtils.join("$$$", playList));
-        return Result.string(vod);
-        }
+            String vod_play_from = TextUtils.join("$$$", playFrom);
+            String vod_play_url = TextUtils.join("$$$", playList);
+            vod.put("vod_play_from", vod_play_from);
+            vod.put("vod_play_url", vod_play_url);
 
-    @Override
-    public String playerContent(String flag, String id, List<String> vipFlags) {
-            String webUrl = rule.getPlayUrl().isEmpty() ? id : rule.getPlayUrl().replace("{playUrl}", id);
-            SpiderDebug.log(webUrl);
-        HashMap<String, String> headers = new HashMap<>();
-        if (rule.getPlayUa().length() > 0) headers.put("User-Agent", rule.getPlayUa());
-        if (rule.getPlayReferer().length() > 0) headers.put("Referer", rule.getPlayReferer());
-        return Result.get().parse().url(webUrl).header(headers).string();
+            detailContentExt(webContent, vod);
+
+            JSONObject result = new JSONObject();
+            JSONArray list = new JSONArray();
+            list.put(vod);
+            result.put("list", list);
+            SpiderDebug.log("detailContent: "+result.toString());
+            return result.toString();
+        } catch (Exception e) {
+            SpiderDebug.log(e);
+        }
+        return "";
     }
 
     @Override
-    public String searchContent(String key, boolean quick) throws JSONException {
-        if (rule.getSearchUrl().isEmpty()) return "";
+    public String playerContent(String flag, String id, List<String> vipFlags) {
+        try {
+            fetchRule();
+            String webUrl = rule.getPlayUrl().isEmpty() ? id : rule.getPlayUrl().replace("{playUrl}", id);
+            SpiderDebug.log("playerContent: "+ webUrl);
+            JSONObject result = new JSONObject();
+            result.put("parse", 1);
+            result.put("playUrl", "");
+            if (!rule.getPlayUa().isEmpty()) {
+                result.put("ua", rule.getPlayUa());
+            }
+            result.put("url", webUrl);
+            return result.toString();
+        } catch (Exception e) {
+            SpiderDebug.log("playerContent: "+e);
+        }
+        return "";
+    }
+
+    @Override
+    public String searchContent(String key, boolean quick) {
+        try {
+            fetchRule();
+            if (rule.getSearchUrl().isEmpty()) {
+                return "";
+            }
             String webUrl = rule.getSearchUrl().replace("{wd}", URLEncoder.encode(key));
             String webContent = fetch(webUrl);
-        List<Vod> list = new ArrayList<>();
+            JSONObject result = new JSONObject();
+            JSONArray videos = new JSONArray();
+            // add maccms suggest search api support
             if (rule.getSearchVodNode().startsWith("json:")) {
                 String[] node = rule.getSearchVodNode().substring(5).split(">");
                 JSONObject data = new JSONObject(webContent);
@@ -296,7 +388,12 @@ public class XPath extends Spider {
                             pic = Misc.fixUrl(webUrl, pic);
                             String mark = vod.optString(rule.getSearchVodMark()).trim();
                             mark = rule.getSearchVodMarkR(mark);
-                        list.add(new Vod(id, name, pic, mark));
+                            JSONObject v = new JSONObject();
+                            v.put("vod_id", id);
+                            v.put("vod_name", name);
+                            v.put("vod_pic", pic);
+                            v.put("vod_remarks", mark);
+                            videos.put(v);
                         }
                     } else {
                         data = data.getJSONObject(node[i]);
@@ -319,20 +416,50 @@ public class XPath extends Spider {
                             mark = vodNodes.get(i).selOne(rule.getSearchVodMark()).asString().trim();
                             mark = rule.getSearchVodMarkR(mark);
                         } catch (Exception e) {
-                            SpiderDebug.log(e);
+                            SpiderDebug.log("searchContent: "+e);
                         }
                     }
-                list.add(new Vod(id, name, pic, mark));
+                    JSONObject v = new JSONObject();
+                    v.put("vod_id", id);
+                    v.put("vod_name", name);
+                    v.put("vod_pic", pic);
+                    v.put("vod_remarks", mark);
+                    videos.put(v);
+                }
+            }
+            result.put("list", videos);
+            return result.toString();
+        } catch (
+                Exception e) {
+            SpiderDebug.log("searchContent: "+e);
+        }
+        return "";
+    }
+
+    protected String ext = null;
+    protected XPathRule rule = null;
+
+    protected void fetchRule() {
+        if (rule == null) {
+            if (ext != null) {
+                if (ext.startsWith("http")) {
+                    String json = OkHttpUtil.string(ext, null);
+                    rule = XPathRule.fromJson(json);
+                    loadRuleExt(json);
+                } else {
+                    rule = XPathRule.fromJson(ext);
+                    loadRuleExt(ext);
+                }
             }
         }
-        return Result.string(list);
     }
 
     protected void loadRuleExt(String json) {
+
     }
 
     protected String fetch(String webUrl) {
-        SpiderDebug.log(webUrl);
-        return OkHttpUtil.string(webUrl, getHeaders());
+        SpiderDebug.log("fetch: "+webUrl);
+        return OkHttpUtil.string(webUrl, getHeaders(webUrl));
     }
 }
