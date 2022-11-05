@@ -42,8 +42,4 @@ dependencies {
     implementation 'cn.wanghaomiao:JsoupXpath:2.5.1'
     implementation 'com.google.zxing:core:3.5.0'
     implementation 'org.jsoup:jsoup:1.15.3'
-
-    /* 原来的
-    annotationProcessor "com.github.liujingxing.rxhttp:rxhttp-compiler:$rxhttp_version"
-    */
 }
