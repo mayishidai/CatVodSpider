@@ -1,13 +1,21 @@
 package com.github.catvod.spider;
 
+import android.os.SystemClock;
 import android.text.TextUtils;
+import android.view.Gravity;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 
 import com.github.catvod.bean.Result;
 import com.github.catvod.bean.Vod;
+import com.github.catvod.bean.ali.Data;
 import com.github.catvod.bean.ali.Item;
 import com.github.catvod.net.OkHttpUtil;
 import com.github.catvod.utils.Misc;
+import com.github.catvod.utils.Prefers;
+import com.github.catvod.utils.QRCode;
 import com.github.catvod.utils.Trans;
+import com.google.gson.JsonObject;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -21,6 +29,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,13 +41,15 @@ import java.util.regex.Pattern;
 public class Ali {
 
     private final Pattern pattern = Pattern.compile("www.aliyundrive.com/s/([^/]+)(/folder/([^/]+))?");
-    private final String refreshToken;
+    private ScheduledExecutorService service;
     private static String accessToken;
+    private String refreshToken;
+    private ImageView view;
 
     public Ali(String token) {
         if (TextUtils.isEmpty(token)) Init.show("尚未設定 Token");
         if (token.startsWith("http")) token = OkHttpUtil.string(token);
-        refreshToken = token;
+        refreshToken = Prefers.getString("token", token);
     }
 
     private static HashMap<String, String> getHeaders() {
@@ -77,7 +90,7 @@ public class Ali {
         String fileId = ids[2];
         String sub = getSub(shareId, shareToken, ids);
         refreshAccessToken();
-        if (TextUtils.isEmpty(accessToken)) return "";
+        while (TextUtils.isEmpty(accessToken)) SystemClock.sleep(250);
         if (flag.equals("原畫")) {
             return Result.get().url(getDownloadUrl(shareId, shareToken, fileId)).sub(sub).header(getHeaders()).string();
         } else {
@@ -99,6 +112,7 @@ public class Ali {
         List<String> playUrls = new ArrayList<>();
         List<String> names = new ArrayList<>(name2id.keySet());
         for (String name : names) playUrls.add(Trans.get(name) + "$" + name2id.get(name) + findSubs(name, subMap));
+        if (playUrls.isEmpty()) Init.show("來晚啦，該分享已失效。");
         List<String> sourceUrls = new ArrayList<>();
         sourceUrls.add(TextUtils.join("#", playUrls));
         sourceUrls.add(TextUtils.join("#", playUrls));
@@ -162,8 +176,10 @@ public class Ali {
             JSONObject object = new JSONObject(post("https://auth.aliyundrive.com/v2/account/token", body));
             accessToken = object.getString("token_type") + " " + object.getString("access_token");
         } catch (JSONException e) {
-            Init.show("Token 已失效");
+            accessToken = null;
             e.printStackTrace();
+            checkService();
+            getQRCode();
         }
     }
 
@@ -201,6 +217,7 @@ public class Ali {
             String json = post("v2/share_link/get_share_token", body);
             return new JSONObject(json).getString("share_token");
         } catch (JSONException e) {
+            Init.show("來晚啦，該分享已失效。");
             e.printStackTrace();
             return "";
         }
@@ -263,5 +280,43 @@ public class Ali {
         result[1] = "application/octet-stream";
         result[2] = new ByteArrayInputStream(text.getBytes());
         return result;
+    }
+
+    private void checkService() {
+        if (service != null) service.shutdownNow();
+        if (view != null) Init.run(() -> Misc.removeView(view));
+    }
+
+    private void getQRCode() {
+        Data data = Data.objectFrom(OkHttpUtil.string("https://easy-token.cooluc.com/qr"));
+        if (data != null) Init.run(() -> showCode(data));
+        service = Executors.newScheduledThreadPool(1);
+        if (data != null) service.scheduleAtFixedRate(() -> {
+            JsonObject params = new JsonObject();
+            params.addProperty("t", data.getData().getT());
+            params.addProperty("ck", data.getData().getCk());
+            Data result = Data.objectFrom(OkHttpUtil.postJson("https://easy-token.cooluc.com/ck", params.toString()));
+            if (result.hasToken()) setToken(result.getData().getRefreshToken());
+        }, 1, 1, TimeUnit.SECONDS);
+    }
+
+    private void setToken(String value) {
+        Prefers.put("token", refreshToken = value);
+        Init.show("請重新進入播放頁");
+        checkService();
+    }
+
+    private void showCode(Data data) {
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        params.gravity = Gravity.CENTER;
+        Misc.addView(view = create(data.getData().getCodeContent()), params);
+        Init.show("請使用阿里雲盤 App 掃描二維碼");
+    }
+
+    private ImageView create(String value) {
+        ImageView view = new ImageView(Init.context());
+        view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        view.setImageBitmap(QRCode.getBitmap(value, 250, 2));
+        return view;
     }
 }

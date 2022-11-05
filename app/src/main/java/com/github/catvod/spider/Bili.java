@@ -12,6 +12,7 @@ import com.github.catvod.utils.Misc;
 import com.github.catvod.utils.Trans;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
 
@@ -19,7 +20,6 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * @author ColaMint & FongMi
@@ -30,17 +30,17 @@ public class Bili extends Spider {
     private HashMap<String, String> header;
     private JSONObject ext;
 
-    private void initHeader() {
+    private String getCookie(String cookie) {
+        if (TextUtils.isEmpty(cookie)) return "buvid3=84B0395D-C9F2-C490-E92E-A09AB48FE26E71636infoc";
+        if (cookie.startsWith("http")) return OkHttpUtil.string(cookie);
+        return cookie;
+    }
+
+    private void initHeader(JSONObject ext) throws JSONException {
         header = new HashMap<>();
+        header.put("cookie", getCookie(ext.getString("cookie")));
         header.put("User-Agent", Misc.CHROME);
-        HashMap<String, List<String>> respHeaderMap = new HashMap<>();
-        OkHttpUtil.string(url, header, respHeaderMap);
-        for (String text : Objects.requireNonNull(respHeaderMap.get("set-cookie"))) {
-            if (!text.contains("buvid3")) continue;
-            header.put("cookie", text.split(";")[0]);
-            header.put("Referer", url);
-            break;
-        }
+        header.put("Referer", url);
     }
 
     @Override
@@ -48,7 +48,7 @@ public class Bili extends Spider {
         try {
             if (extend.startsWith("http")) extend = OkHttpUtil.string(extend);
             ext = new JSONObject(extend);
-            initHeader();
+            initHeader(ext);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -99,7 +99,7 @@ public class Bili extends Spider {
         for (int i = 0; i < pages.length(); ++i) {
             JSONObject page = pages.getJSONObject(i);
             String title = page.getString("part").replace("$", "_").replace("#", "_");
-            playlist.add(Trans.get(title) + "$" + aid + "+ " + page.getLong("cid"));
+            playlist.add(Trans.get(title) + "$" + aid + "+" + page.getLong("cid"));
         }
         Vod vod = new Vod();
         vod.setVodId(bvid);
@@ -123,7 +123,7 @@ public class Bili extends Spider {
         String[] ids = id.split("\\+");
         String aid = ids[0];
         String cid = ids[1];
-        String url = "https://api.bilibili.com/x/player/playurl?avid=" + aid + "&cid= " + cid + "&qn=112";
+        String url = "https://api.bilibili.com/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=120&fourk=1";
         JSONObject resp = new JSONObject(OkHttpUtil.string(url, header));
         url = resp.getJSONObject("data").getJSONArray("durl").getJSONObject(0).getString("url");
         return Result.get().url(url).header(header).string();

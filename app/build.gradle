@@ -37,11 +37,13 @@ android {
 }
 
 dependencies {
-    implementation "org.jsoup:jsoup:$jsoup_version"
-    implementation "cn.wanghaomiao:JsoupXpath:$jsoupxpath_version"
-    implementation "com.squareup.okhttp3:okhttp:$okhttp_version"
-    implementation ("com.github.liujingxing.rxhttp:rxhttp:$rxhttp_version") {
-        exclude group: "com.squareup.okhttp3"
-    }
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+    implementation 'com.google.code.gson:gson:2.9.1'
+    implementation 'cn.wanghaomiao:JsoupXpath:2.5.1'
+    implementation 'com.google.zxing:core:3.5.0'
+    implementation 'org.jsoup:jsoup:1.15.3'
+
+    /* 原来的
     annotationProcessor "com.github.liujingxing.rxhttp:rxhttp-compiler:$rxhttp_version"
+    */
 }
