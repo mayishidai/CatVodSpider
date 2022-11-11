@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 
 import com.github.catvod.R;
+import com.github.catvod.spider.Init;
 
 public class MainActivity extends Activity {
 
