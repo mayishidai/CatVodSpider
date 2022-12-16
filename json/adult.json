@@ -1,12 +1,16 @@
 {
-  "spider": "https://ghproxy.com/https://raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar;md5;50312162df32af94104285e780c504fe",
+  "spider": "https://ghproxy.com/https://raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar;md5;e889b257fb9dbaf519f3c095231c12ea",
   "wallpaper": "https://gao.chuqiuyu.tk",
   "lives": [
     {
-      "name": "直播",
+      "name": "Adult",
       "type": 0,
-      "url": "https://raw.githubusercontent.com/jackson0829/jackson0829.github.io/main/TW.txt",
-      "epg": "http://epg.51zmt.top:8000/api/diyp/?ch={name}&date={date}"
+      "url": "https://ghproxy.com/https://raw.githubusercontent.com/YanG-1989/m3u/main/Adult.m3u"
+    },
+    {
+      "name": "10086",
+      "type": 0,
+      "url": "https://agit.ai/VivoMax/Fu/raw/branch/master/drzb.txt"
     }
   ],
   "sites": [
@@ -17,7 +21,23 @@
       "api": "csp_AList",
       "searchable": 1,
       "filterable": 1,
-      "ext": "9T$https://drive.9t.ee#木偶$https://www.kugutsu.ml"
+      "ext": {
+        "drives": [
+          {
+            "name": "9T",
+            "server": "https://drive.9t.ee"
+          },
+          {
+            "name": "木偶",
+            "server": "https://www.kugutsu.ml"
+          },
+          {
+            "name": "秋雨",
+            "server": "https://share.laowang.me",
+            "password": "s8;K^h[j<b"
+          }
+        ]
+      }
     },
     {
       "key": "泥巴",
@@ -667,7 +687,7 @@
       "api": "csp_Push",
       "searchable": 1,
       "filterable": 1,
-      "ext": "http://home.jundie.top:666/token.txt"
+      "ext": "http://ali.饭太硬.ml/tok"
     }
   ]
 }

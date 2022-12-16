@@ -1,5 +1,5 @@
 {
-  "spider": "https://ghproxy.com/https://raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar;md5;50312162df32af94104285e780c504fe",
+  "spider": "https://ghproxy.com/https://raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar;md5;e889b257fb9dbaf519f3c095231c12ea",
   "wallpaper": "http://www.kf666888.cn/api/tvbox/img",
   "lives": [
     {
@@ -115,7 +115,7 @@
       "api": "csp_Paper",
       "searchable": 1,
       "filterable": 1,
-      "ext": "http://home.jundie.top:666/token.txt"
+      "ext": "http://ali.饭太硬.ml/tok"
     },
     {
       "key": "易搜",
@@ -124,7 +124,7 @@
       "api": "csp_YiSo",
       "searchable": 1,
       "filterable": 0,
-      "ext": "http://home.jundie.top:666/token.txt"
+      "ext": "http://ali.饭太硬.ml/tok"
     },
     {
       "key": "盤搜",
@@ -133,7 +133,16 @@
       "api": "csp_PanSou",
       "searchable": 1,
       "filterable": 0,
-      "ext": "http://home.jundie.top:666/token.txt"
+      "ext": "http://ali.饭太硬.ml/tok"
+    },
+    {
+      "key": "找資源",
+      "name": "找資源",
+      "type": 3,
+      "api": "csp_Zhaozy",
+      "searchable": 1,
+      "filterable": 0,
+      "ext": "http://ali.饭太硬.ml/tok"
     },
     {
       "key": "push_agent",
@@ -142,7 +151,7 @@
       "api": "csp_Push",
       "searchable": 1,
       "filterable": 0,
-      "ext": "http://home.jundie.top:666/token.txt"
+      "ext": "http://ali.饭太硬.ml/tok"
     }
   ]
 }

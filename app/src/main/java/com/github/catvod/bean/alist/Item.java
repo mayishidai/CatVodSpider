@@ -18,6 +18,8 @@ public class Item {
 
     @SerializedName("name")
     private String name;
+    @SerializedName(value = "path", alternate = "parent")
+    private String path;
     @SerializedName("type")
     private int type;
     @SerializedName("size")
@@ -39,11 +41,27 @@ public class Item {
     }
 
     public String getName() {
-        return name;
+        return TextUtils.isEmpty(name) ? "" : name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getPath() {
+        return TextUtils.isEmpty(path) ? "" : path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
     }
 
     public int getType() {
         return type;
+    }
+
+    public void setType(int type) {
+        this.type = type;
     }
 
     public long getSize() {
@@ -75,8 +93,13 @@ public class Item {
         return getType() == 1;
     }
 
-    public boolean ignore(boolean v3) {
-        if (v3) return getType() == 0 || getType() == 4;
+    public boolean isMedia(boolean isNew) {
+        if (isNew) return getType() == 2 || getType() == 3;
+        return getType() == 3 || getType() == 4;
+    }
+
+    public boolean ignore(boolean isNew) {
+        if (isNew) return getType() == 0 || getType() == 4;
         return getType() == 0 || getType() == 2 || getType() == 5;
     }
 
@@ -85,7 +108,7 @@ public class Item {
     }
 
     public String getVodId(String id) {
-        return id + "/" + getName();
+        return id + getPath() + "/" + getName();
     }
 
     public String getPic() {

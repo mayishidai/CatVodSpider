@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.reflect.TypeToken;
 
-import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
 import java.lang.reflect.Type;
@@ -33,6 +32,14 @@ public class Result {
     private int parse;
     @SerializedName("jx")
     private int jx;
+    @SerializedName("page")
+    private int page;
+    @SerializedName("pagecount")
+    private int pagecount;
+    @SerializedName("limit")
+    private int limit;
+    @SerializedName("total")
+    private int total;
 
     public static String string(List<Class> classes, List<Vod> list, LinkedHashMap<String, List<Filter>> filters) {
         return Result.get().classes(classes).vod(list).filters(filters).string();
@@ -88,7 +95,8 @@ public class Result {
 
     public Result filters(JSONObject object) {
         if (object == null) return this;
-        Type listType = new TypeToken<LinkedHashMap<String, List<Filter>>>() {}.getType();
+        Type listType = new TypeToken<LinkedHashMap<String, List<Filter>>>() {
+        }.getType();
         LinkedHashMap<String, List<Filter>> filters = new Gson().fromJson(object.toString(), listType);
         for (Map.Entry<String, List<Filter>> entry : filters.entrySet()) for (Filter filter : entry.getValue()) filter.trans();
         this.filters = filters;
@@ -126,6 +134,18 @@ public class Result {
         return this;
     }
 
+    public Result page() {
+        return page(1, 1, 0, 1);
+    }
+
+    public Result page(int page, int count, int limit, int total) {
+        this.page = page > 0 ? page : Integer.MAX_VALUE;
+        this.limit = limit > 0 ? limit : Integer.MAX_VALUE;
+        this.total = total > 0 ? total : Integer.MAX_VALUE;
+        this.pagecount = count > 0 ? page : Integer.MAX_VALUE;
+        return this;
+    }
+
     public List<Vod> getList() {
         return list == null ? Collections.emptyList() : list;
     }
@@ -134,7 +154,6 @@ public class Result {
         return toString();
     }
 
-    @NotNull
     @Override
     public String toString() {
         return new Gson().toJson(this);

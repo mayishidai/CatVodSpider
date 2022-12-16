@@ -25,14 +25,13 @@ import java.util.Map;
 public class PanSou extends Spider {
 
     private final String siteUrl = "https://www.alipansou.com";
-    private HashMap<String, String> header;
     private Ali ali;
 
     private Map<String, String> getHeaders(String id) {
         HashMap<String, String> headers = new HashMap<>();
         headers.put("User-Agent", Misc.CHROME);
         headers.put("Referer", siteUrl + id);
-        headers.put("_bid", "d1810141fb539895ce233cdf66414ca7");
+        headers.put("_bid", "6d14a5dd6c07980d9dc089a693805ad8");
         return headers;
     }
 
@@ -43,7 +42,7 @@ public class PanSou extends Spider {
 
     @Override
     public String detailContent(List<String> ids) throws Exception {
-        String url = siteUrl + ids.get(0).replace("s", "cv");
+        String url = siteUrl + ids.get(0).replace("/s/", "/cv/");
         Map<String, List<String>> respHeaders = new HashMap<>();
         OkHttpUtil.stringNoRedirect(url, getHeaders(ids.get(0)), respHeaders);
         url = OkHttpUtil.getRedirectLocation(respHeaders);

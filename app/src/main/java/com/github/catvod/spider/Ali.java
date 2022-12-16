@@ -10,6 +10,7 @@ import com.github.catvod.bean.Result;
 import com.github.catvod.bean.Vod;
 import com.github.catvod.bean.ali.Data;
 import com.github.catvod.bean.ali.Item;
+import com.github.catvod.crawler.SpiderDebug;
 import com.github.catvod.net.OkHttpUtil;
 import com.github.catvod.utils.Misc;
 import com.github.catvod.utils.Prefers;
@@ -28,7 +29,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -42,8 +42,9 @@ public class Ali {
 
     private final Pattern pattern = Pattern.compile("www.aliyundrive.com/s/([^/]+)(/folder/([^/]+))?");
     private ScheduledExecutorService service;
-    private static String accessToken;
+    private static String authorization;
     private String refreshToken;
+    private long expiresTime;
     private ImageView view;
 
     public Ali(String token) {
@@ -61,7 +62,7 @@ public class Ali {
 
     private static HashMap<String, String> getHeaders(String shareToken) {
         HashMap<String, String> headers = getHeaders();
-        if (accessToken != null) headers.put("authorization", accessToken);
+        if (authorization != null) headers.put("authorization", authorization);
         headers.put("x-share-token", shareToken);
         return headers;
     }
@@ -84,13 +85,14 @@ public class Ali {
     }
 
     public String playerContent(String flag, String id) {
+        if (id.equals("无数据")) return "";
         String[] ids = id.split("\\+");
         String shareId = ids[0];
         String shareToken = ids[1];
         String fileId = ids[2];
         String sub = getSub(shareId, shareToken, ids);
-        refreshAccessToken();
-        while (TextUtils.isEmpty(accessToken)) SystemClock.sleep(250);
+        if (System.currentTimeMillis() > expiresTime) refreshAccessToken();
+        while (TextUtils.isEmpty(authorization)) SystemClock.sleep(250);
         if (flag.equals("原畫")) {
             return Result.get().url(getDownloadUrl(shareId, shareToken, fileId)).sub(sub).header(getHeaders()).string();
         } else {
@@ -106,13 +108,13 @@ public class Ali {
         body.put("share_id", shareId);
         String json = post("adrive/v3/share_link/get_share_by_anonymous", body);
         JSONObject object = new JSONObject(json);
-        LinkedHashMap<String, String> name2id = new LinkedHashMap<>();
+        LinkedHashMap<Item, String> fileMap = new LinkedHashMap<>();
         Map<String, List<String>> subMap = new HashMap<>();
-        listFiles(new Item(getParentFileId(fileId, object)), name2id, subMap, shareId, shareToken);
+        listFiles(new Item(getParentFileId(fileId, object)), fileMap, subMap, shareId, shareToken);
         List<String> playUrls = new ArrayList<>();
-        List<String> names = new ArrayList<>(name2id.keySet());
-        for (String name : names) playUrls.add(Trans.get(name) + "$" + name2id.get(name) + findSubs(name, subMap));
-        if (playUrls.isEmpty()) Init.show("來晚啦，該分享已失效。");
+        List<Item> files = new ArrayList<>(fileMap.keySet());
+        for (Item file : files) playUrls.add(Trans.get(file.getDisplayName()) + "$" + fileMap.get(file) + findSubs(file.getName(), subMap));
+        if (playUrls.isEmpty()) playUrls.add("无数据$无数据");
         List<String> sourceUrls = new ArrayList<>();
         sourceUrls.add(TextUtils.join("#", playUrls));
         sourceUrls.add(TextUtils.join("#", playUrls));
@@ -127,34 +129,36 @@ public class Ali {
         return vod;
     }
 
-    private void listFiles(Item folder, LinkedHashMap<String, String> name2id, Map<String, List<String>> subMap, String shareId, String shareToken) throws Exception {
+    private void listFiles(Item folder, LinkedHashMap<Item, String> name2id, Map<String, List<String>> subMap, String shareId, String shareToken) throws Exception {
+        listFiles(folder, name2id, subMap, shareId, shareToken, "");
+    }
+
+    private void listFiles(Item parent, LinkedHashMap<Item, String> name2id, Map<String, List<String>> subMap, String shareId, String shareToken, String marker) throws Exception {
         JSONObject body = new JSONObject();
+        List<Item> folders = new ArrayList<>();
+        body.put("limit", 200);
         body.put("share_id", shareId);
-        body.put("parent_file_id", folder.getId());
+        body.put("parent_file_id", parent.getFileId());
         body.put("order_by", "name");
         body.put("order_direction", "ASC");
-        String json = post("adrive/v3/file/list", body, shareToken);
-        JSONArray items = new JSONObject(json).getJSONArray("items");
-        for (int j = 0; j < items.length(); ++j) {
-            JSONObject item = items.getJSONObject(j);
-            String type = item.optString("type");
-            String name = item.optString("name");
-            String fileId = item.optString("file_id");
-            String category = item.optString("category", "");
-            String ext = item.optString("file_extension", "");
-            if (type.equals("folder")) {
-                listFiles(new Item(fileId, name), name2id, subMap, shareId, shareToken);
-                continue;
+        if (marker.length() > 0) body.put("marker", marker);
+        Item item = Item.objectFrom(post("adrive/v3/file/list", body, shareToken));
+        for (Item file : item.getItems()) {
+            if (file.getType().equals("folder")) {
+                folders.add(file);
+            } else if (file.getCategory().equals("video") || file.getCategory().equals("audio")) {
+                name2id.put(file, shareId + "+" + shareToken + "+" + file.getFileId());
+            } else if (Misc.isSub(file.getExt())) {
+                String key = file.removeExt();
+                if (!subMap.containsKey(key)) subMap.put(key, new ArrayList<>());
+                subMap.get(key).add(key + "@" + file.getFileId() + "@" + file.getExt());
             }
-            if (category.equals("video")) {
-                name2id.put(folder.getName(name), shareId + "+" + shareToken + "+" + fileId);
-                continue;
-            }
-            if (Misc.isSub(ext)) {
-                name = name.replace("." + ext, "");
-                if (!subMap.containsKey(name)) subMap.put(name, new ArrayList<>());
-                Objects.requireNonNull(subMap.get(name)).add(name + "@" + fileId + "@" + ext);
-            }
+        }
+        if (item.getNextMarker().length() > 0) {
+            listFiles(parent, name2id, subMap, shareId, shareToken, item.getNextMarker());
+        }
+        for (Item folder : folders) {
+            listFiles(folder, name2id, subMap, shareId, shareToken);
         }
     }
 
@@ -174,9 +178,12 @@ public class Ali {
             body.put("refresh_token", refreshToken);
             body.put("grant_type", "refresh_token");
             JSONObject object = new JSONObject(post("https://auth.aliyundrive.com/v2/account/token", body));
-            accessToken = object.getString("token_type") + " " + object.getString("access_token");
+            authorization = object.getString("token_type") + " " + object.getString("access_token");
+            expiresTime = System.currentTimeMillis() + object.getInt("expires_in") * 1000L;
+            refreshToken = object.getString("refresh_token");
+            SpiderDebug.log("refresh token: " + refreshToken);
         } catch (JSONException e) {
-            accessToken = null;
+            authorization = null;
             e.printStackTrace();
             checkService();
             getQRCode();
@@ -224,7 +231,7 @@ public class Ali {
     }
 
     private String getPreviewQuality(JSONArray taskList) throws Exception {
-        for (String templateId : Arrays.asList("UHD", "QHD", "FHD", "HD", "SD", "LD")) {
+        for (String templateId : Arrays.asList("FHD", "HD", "SD", "LD")) {
             for (int i = 0; i < taskList.length(); ++i) {
                 JSONObject task = taskList.getJSONObject(i);
                 if (task.getString("template_id").equals(templateId)) {
